@@ -87,20 +87,45 @@ class CarbonAPIHandler:
             "type": "vehicle",
             "distance_unit": "km",
             "distance_value": distance_km,
-            "vehicle_model_id": vehicle_uuid  # Use UUID instead of string
+            "vehicle_model_id": vehicle_uuid
         }
         response = requests.post(url, json=data, headers=self.headers)
 
-        # ✅ Debugging: Print the full response
         print(f"🔍 API Response: {response.status_code} - {response.text}")
 
-        if response.status_code == 201:  # ✅ Make sure it's checking the correct status code
+        if response.status_code == 201:
             result = response.json()
-
-            # ✅ Ensure the response structure is as expected
             if "data" in result and "attributes" in result["data"]:
-                emissions_kg = result["data"]["attributes"].get("carbon_kg", None)  # Extract only carbon_kg
-                print(f"✅ Extracted Emissions: {emissions_kg} kg CO2")  # Debugging
+                emissions_kg = result["data"]["attributes"].get("carbon_kg", None)
+                print(f"✅ Extracted Emissions: {emissions_kg} kg CO2")
+                return emissions_kg
+            else:
+                print("⚠️ Unexpected API response format. Missing 'data' or 'attributes'.")
+                return None
+        else:
+            print(f"❌ API Error {response.status_code}: {response.text}")
+            return None
+
+    def get_flight_emissions(self, departure_airport: str, destination_airport: str, passengers: int = 1, cabin_class: str = "economy"):
+        """Fetch carbon emissions for a flight between two airports."""
+        url = f"{self.BASE_URL}/estimates"
+        data = {
+            "type": "flight",
+            "passengers": passengers,
+            "legs": [
+                {"departure_airport": departure_airport, "destination_airport": destination_airport, "cabin_class": cabin_class}
+            ],
+            "distance_unit": "km"
+        }
+        response = requests.post(url, json=data, headers=self.headers)
+
+        print(f"🔍 API Response: {response.status_code} - {response.text}")
+
+        if response.status_code == 201:
+            result = response.json()
+            if "data" in result and "attributes" in result["data"]:
+                emissions_kg = result["data"]["attributes"].get("carbon_kg", None)
+                print(f"✅ Extracted Emissions: {emissions_kg} kg CO2")
                 return emissions_kg
             else:
                 print("⚠️ Unexpected API response format. Missing 'data' or 'attributes'.")
