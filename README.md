@@ -6,21 +6,16 @@ The **Carbon Emission Tracker** is a Python-based application that allows users 
 ## Features
 - **User Input:** Users enter data related to travel, energy usage, and consumption habits.
 - **Carbon Footprint Calculation:** Uses APIs to fetch emission factors and compute estimated emissions.
-- **Historical Data Storage:** Saves user data locally (CSV/SQLite) or in a cloud database (Firebase/AWS RDS).
 - **Visualization:** Generates charts and reports on emission trends.
 - **Recommendations:** Provides tailored advice on how users can reduce their carbon footprint.
 
 ## API Integration
 To showcase API-handling skills, the project integrates:
 - **Carbon Intensity API** (e.g., [Carbon Interface API](https://www.carboninterface.com/) or [Electricity Maps API](https://www.electricitymaps.com/)) for emissions calculations.
-- **Google Maps API** for distance-based travel emissions.
-- **Weather API** (optional) to factor climate conditions into energy recommendations.
 
 ## Project Structure
 ```
 carbon-emission-tracker/
-├── data/                 # Stores historical emissions data
-├── notebooks/            # Jupyter notebooks for data analysis & visualization
 ├── src/                  # Source code
 │   ├── api_handler.py    # Handles API calls
 │   ├── calculator.py     # Calculates carbon footprint
@@ -65,8 +60,3 @@ Run the application:
 python main.py
 ```
 Follow the prompts to enter your data and get real-time feedback on your carbon emissions.
-
-## Future Enhancements
-- Add a web-based dashboard (Flask/Django + React)
-- Integrate machine learning for more accurate recommendations
-- Support multi-user tracking and cloud storage
