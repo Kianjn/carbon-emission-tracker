@@ -64,3 +64,15 @@ https://repo.anaconda.com/pkgs/main/osx-arm64/requests-2.32.3-py310hca03da5_1.co
 https://repo.anaconda.com/pkgs/main/osx-arm64/matplotlib-base-3.10.0-py310h7ef442a_0.conda
 https://repo.anaconda.com/pkgs/main/osx-arm64/pandas-2.2.3-py310hcf29cfe_0.conda
 https://repo.anaconda.com/pkgs/main/osx-arm64/matplotlib-3.10.0-py310hca03da5_0.conda
+
+# Core dependencies
+flask==3.0.2
+python-dotenv==1.0.1
+requests==2.31.0
+pandas==2.2.0
+numpy==1.26.3
+
+# Development dependencies
+pytest==8.0.0
+black==24.1.1
+flake8==7.0.0

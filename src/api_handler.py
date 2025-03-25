@@ -17,91 +17,95 @@ class CarbonAPIHandler:
             "Authorization": f"Bearer {CARBON_API_KEY}",
             "Content-Type": "application/json"
         }
+        # Cache for vehicle makes and models
+        self._vehicle_makes = None
+        self._vehicle_models_cache = {}
 
     def get_vehicle_makes(self):
         """Fetch all vehicle brands (makes) from API."""
+        if self._vehicle_makes is not None:
+            return self._vehicle_makes
+
         url = f"{self.BASE_URL}/vehicle_makes"
         response = requests.get(url, headers=self.headers)
 
         if response.status_code == 200:
-            return [
-                {
-                    "id": make["data"]["id"],
-                    "name": make["data"]["attributes"]["name"]
-                }
-                for make in response.json()
-            ]
+            data = response.json()
+            if isinstance(data, list):
+                makes = [
+                    {
+                        "id": make["data"]["id"],
+                        "name": make["data"]["attributes"]["name"]
+                    }
+                    for make in data
+                ]
+                self._vehicle_makes = makes
+                return makes
+            else:
+                print(f"⚠️ Unexpected API response format for vehicle makes: {data}")
+                return []
         else:
-            print(f"Error {response.status_code}: {response.text}")
-            return None
+            print(f"❌ API Error {response.status_code}: {response.text}")
+            return []
 
     def get_vehicle_models(self, make_id):
         """Fetch vehicle models based on a brand (make_id)."""
+        if make_id in self._vehicle_models_cache:
+            return self._vehicle_models_cache[make_id]
+
         url = f"{self.BASE_URL}/vehicle_makes/{make_id}/vehicle_models"
         response = requests.get(url, headers=self.headers)
 
         if response.status_code == 200:
-            return [
-                {
-                    "id": model["data"]["id"],
-                    "name": model["data"]["attributes"]["name"]
-                }
-                for model in response.json()
-            ]
+            data = response.json()
+            if isinstance(data, list):
+                models = [
+                    {
+                        "id": model["data"]["id"],
+                        "name": model["data"]["attributes"]["name"]
+                    }
+                    for model in data
+                ]
+                self._vehicle_models_cache[make_id] = models
+                return models
+            else:
+                print(f"⚠️ Unexpected API response format for vehicle models: {data}")
+                return []
         else:
-            print(f"Error {response.status_code}: {response.text}")
-            return None
-
-    def get_vehicle_uuid(self, vehicle_make: str, vehicle_model: str):
-        """Find the vehicle UUID based on make and model."""
-        makes = self.get_vehicle_makes()
-        if not makes:
-            return None
-        
-        make_id = next((make["id"] for make in makes if make["name"].lower() == vehicle_make.lower()), None)
-        if not make_id:
-            print(f"⚠️ Error: Vehicle make '{vehicle_make}' not found.")
-            return None
-
-        models = self.get_vehicle_models(make_id)
-        if not models:
-            return None
-
-        model_id = next((model["id"] for model in models if model["name"].lower() == vehicle_model.lower()), None)
-        if not model_id:
-            print(f"⚠️ Error: Vehicle model '{vehicle_model}' not found for make '{vehicle_make}'.")
-            return None
-
-        return model_id
+            print(f"❌ API Error {response.status_code}: {response.text}")
+            return []
 
     def get_vehicle_emissions(self, vehicle_make: str, vehicle_model: str, distance_km: float):
         """Fetch carbon emissions for a given vehicle and distance."""
-        vehicle_uuid = self.get_vehicle_uuid(vehicle_make, vehicle_model)
-        if not vehicle_uuid:
-            return None
+        try:
+            # Calculate emissions directly using the provided model ID
+            url = f"{self.BASE_URL}/estimates"
+            data = {
+                "type": "vehicle",
+                "distance_unit": "km",
+                "distance_value": distance_km,
+                "vehicle_model_id": vehicle_model  # This is now the model ID directly
+            }
+            response = requests.post(url, json=data, headers=self.headers)
 
-        url = f"{self.BASE_URL}/estimates"
-        data = {
-            "type": "vehicle",
-            "distance_unit": "km",
-            "distance_value": distance_km,
-            "vehicle_model_id": vehicle_uuid
-        }
-        response = requests.post(url, json=data, headers=self.headers)
-
-        print(f"🔍 API Response: {response.status_code} - {response.text}")
-
-        if response.status_code == 201:
-            result = response.json()
-            if "data" in result and "attributes" in result["data"]:
-                emissions_kg = result["data"]["attributes"].get("carbon_kg", None)
-                print(f"✅ Extracted Emissions: {emissions_kg} kg CO2")
-                return emissions_kg
+            if response.status_code == 201:
+                result = response.json()
+                if "data" in result and "attributes" in result["data"]:
+                    emissions_kg = result["data"]["attributes"].get("carbon_kg", None)
+                    if emissions_kg is not None:
+                        print(f"✅ Calculated emissions: {emissions_kg} kg CO2")
+                        return emissions_kg
+                    else:
+                        print("⚠️ No emissions data found in API response")
+                        return None
+                else:
+                    print("⚠️ Unexpected API response format")
+                    return None
             else:
-                print("⚠️ Unexpected API response format. Missing 'data' or 'attributes'.")
+                print(f"❌ API Error {response.status_code}: {response.text}")
                 return None
-        else:
-            print(f"❌ API Error {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"❌ Error calculating vehicle emissions: {str(e)}")
             return None
 
     def get_flight_emissions(self, departure_airport: str, destination_airport: str, passengers: int = 1, cabin_class: str = "economy"):
