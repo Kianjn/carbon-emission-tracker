@@ -7,11 +7,12 @@ def main():
     print("Choose carbon tracking type:")
     print("1. Vehicle Travel")
     print("2. Flight")
-    
-    choice = input("Enter 1 or 2: ").strip()
-    
+    print("3. Electricity Consumption")
+
+    choice = input("Enter 1, 2, or 3: ").strip()
+
     if choice == "1":
-        # Vehicle emissions tracking (no display of available makes)
+        # Vehicle emissions tracking
         vehicle_make = input("\nEnter vehicle make (e.g., Toyota, Ford, BMW): ").strip()
         available_makes = calculator.api_handler.get_vehicle_makes()
         make_id = next((make["id"] for make in available_makes if make["name"].lower() == vehicle_make.lower()), None)
@@ -19,7 +20,6 @@ def main():
         if make_id:
             available_models = calculator.api_handler.get_vehicle_models(make_id)
             if available_models:
-                # No listing of available models, just directly asking for model input
                 vehicle_model = input("\nEnter vehicle model: ").strip()
                 distance_km = float(input("Enter distance traveled (in km): "))
 
@@ -27,10 +27,10 @@ def main():
                 print(f"Estimated travel emissions: {travel_emissions} kg CO2")
             else:
                 print("⚠️ No models found for this make.")
-                return  # Exit if no models are found
+                return
         else:
             print(f"⚠️ Error: Vehicle make '{vehicle_make}' not found.")
-            return  # Exit if the make is invalid
+            return
 
     elif choice == "2":
         # Flight emissions tracking
@@ -41,8 +41,16 @@ def main():
         flight_emissions = calculator.calculate_flight_emissions(departure_airport, destination_airport, passengers)
         print(f"Estimated flight emissions: {flight_emissions} kg CO2")
 
+    elif choice == "3":
+        # Electricity consumption emissions tracking
+        country_code = input("\nEnter the country code (e.g., US, CA, GB): ").strip().lower()
+        electricity_value = float(input("Enter the electricity consumption (in kWh): ").strip())
+        
+        electricity_emissions = calculator.calculate_energy_emissions(country_code, electricity_value)
+        print(f"Estimated electricity emissions: {electricity_emissions} kg CO2")
+
     else:
-        print("⚠️ Invalid choice. Please enter 1 or 2.")
+        print("⚠️ Invalid choice. Please enter 1, 2, or 3.")
 
 if __name__ == "__main__":
     main()

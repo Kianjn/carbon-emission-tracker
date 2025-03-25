@@ -58,13 +58,11 @@ class CarbonAPIHandler:
         if not makes:
             return None
         
-        # Find the correct brand (make)
         make_id = next((make["id"] for make in makes if make["name"].lower() == vehicle_make.lower()), None)
         if not make_id:
             print(f"⚠️ Error: Vehicle make '{vehicle_make}' not found.")
             return None
 
-        # Find the model within the selected make
         models = self.get_vehicle_models(make_id)
         if not models:
             return None
@@ -116,6 +114,29 @@ class CarbonAPIHandler:
                 {"departure_airport": departure_airport, "destination_airport": destination_airport, "cabin_class": cabin_class}
             ],
             "distance_unit": "km"
+        }
+        response = requests.post(url, json=data, headers=self.headers)
+
+        if response.status_code == 201:
+            result = response.json()
+            if "data" in result and "attributes" in result["data"]:
+                emissions_kg = result["data"]["attributes"].get("carbon_kg", None)
+                return emissions_kg
+            else:
+                print("⚠️ Unexpected API response format. Missing 'data' or 'attributes'.")
+                return None
+        else:
+            print(f"❌ API Error {response.status_code}: {response.text}")
+            return None
+
+    def get_electricity_emissions(self, country: str, electricity_value_kwh: float):
+        """Fetch electricity emissions for a given consumption in kWh and country."""
+        url = f"{self.BASE_URL}/estimates"
+        data = {
+            "type": "electricity",
+            "electricity_unit": "kwh",
+            "electricity_value": electricity_value_kwh,
+            "country": country
         }
         response = requests.post(url, json=data, headers=self.headers)
 
