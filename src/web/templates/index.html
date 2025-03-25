@@ -373,48 +373,54 @@
                 });
         });
 
-        // Handle form submissions
-        document.getElementById('vehicleForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            // Reset error messages
-            document.querySelectorAll('.text-red-600').forEach(el => el.classList.add('hidden'));
-            
-            // Validate inputs
-            const make = document.getElementById('vehicleMake').value;
-            const model = document.getElementById('vehicleModel').value;
-            const distance = document.getElementById('distance').value;
-            
-            let hasError = false;
-            
-            if (!make) {
-                document.getElementById('makeError').textContent = 'Please select a vehicle make';
-                document.getElementById('makeError').classList.remove('hidden');
-                hasError = true;
-            }
-            
-            if (!model) {
-                document.getElementById('modelError').textContent = 'Please select a vehicle model';
-                document.getElementById('modelError').classList.remove('hidden');
-                hasError = true;
-            }
-            
-            if (!distance || distance <= 0) {
-                document.getElementById('distanceError').textContent = 'Please enter a valid distance';
-                document.getElementById('distanceError').classList.remove('hidden');
-                hasError = true;
-            }
-            
-            if (hasError) return;
+        let emissionsChart = null;
 
-            const data = {
-                make: make,  // Send the make ID
-                model: model,  // Send the model ID
-                distance: parseFloat(distance)
-            };
+        function updateChart(emissions, type) {
+            const ctx = document.getElementById('emissionsChart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (emissionsChart) {
+                emissionsChart.destroy();
+            }
 
+            // Create new chart
+            emissionsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [type, 'Remaining Budget'],
+                    datasets: [{
+                        data: [emissions, Math.max(2000 - emissions, 0)], // Assuming 2000kg yearly budget
+                        backgroundColor: [
+                            '#10B981',  // Green for emissions
+                            '#E5E7EB'   // Gray for remaining
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw.toFixed(2)} kg CO₂`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // Update the submitCalculation function to include additional stats
+        async function submitCalculation(endpoint, data, type) {
             try {
-                const response = await fetch('/api/calculate/travel', {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -423,29 +429,78 @@
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to calculate emissions');
+                    throw new Error('Network response was not ok');
                 }
 
                 const result = await response.json();
                 
-                if (result.emissions === null) {
-                    throw new Error('Failed to calculate emissions');
+                if (result.error) {
+                    throw new Error(result.error);
                 }
 
-                // Get the display names for the result message
-                const makeSelect = document.getElementById('vehicleMake');
-                const modelSelect = document.getElementById('vehicleModel');
-                const selectedMake = makeSelect.options[makeSelect.selectedIndex].text;
-                const selectedModel = modelSelect.options[modelSelect.selectedIndex].text;
-
+                // Update emissions value and description
                 document.getElementById('emissionsValue').textContent = result.emissions.toFixed(2);
                 document.getElementById('emissionsDescription').textContent = 
-                    `This ${selectedMake} ${selectedModel} travel produces ${result.emissions.toFixed(2)} kg of CO₂ emissions.`;
-                document.getElementById('resultCard').style.display = 'block';
+                    `This ${type} produces ${result.emissions.toFixed(2)} kg of CO₂ emissions.`;
+
+                // Show the result card with animation
+                const resultCard = document.getElementById('resultCard');
+                resultCard.style.display = 'block';
+                
+                // Update the chart
+                updateChart(result.emissions, type);
+
+                // Calculate and update additional stats
+                const treesNeeded = Math.ceil(result.emissions / 20); // 1 tree absorbs ~20kg CO2/year
+                const daysToOffset = Math.ceil(result.emissions / 0.5); // Average person offsets ~0.5kg CO2/day
+                const offsetCost = (result.emissions * 0.02).toFixed(2); // Approximate cost $0.02 per kg CO2
+
+                // Update the stats display
+                document.getElementById('treesValue').textContent = treesNeeded;
+                document.getElementById('daysValue').textContent = daysToOffset;
+                document.getElementById('costValue').textContent = `$${offsetCost}`;
+
             } catch (error) {
                 console.error('Error:', error);
-                alert(error.message || 'An error occurred while calculating emissions. Please try again.');
+                alert('An error occurred while calculating emissions. Please try again.');
+            }
+        }
+
+        // Vehicle form submission
+        document.getElementById('vehicleForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const make = document.getElementById('vehicleMake').value;
+            const model = document.getElementById('vehicleModel').value;
+            const distance = parseFloat(document.getElementById('distance').value);
+
+            // Reset error messages
+            document.getElementById('makeError').style.display = 'none';
+            document.getElementById('modelError').style.display = 'none';
+            document.getElementById('distanceError').style.display = 'none';
+
+            // Validate inputs
+            let hasError = false;
+            if (!make) {
+                document.getElementById('makeError').textContent = 'Please select a vehicle make';
+                document.getElementById('makeError').style.display = 'block';
+                hasError = true;
+            }
+            if (!model) {
+                document.getElementById('modelError').textContent = 'Please select a vehicle model';
+                document.getElementById('modelError').style.display = 'block';
+                hasError = true;
+            }
+            if (!distance || distance <= 0) {
+                document.getElementById('distanceError').textContent = 'Please enter a valid distance';
+                document.getElementById('distanceError').style.display = 'block';
+                hasError = true;
+            }
+
+            if (!hasError) {
+                await submitCalculation('/api/calculate/vehicle', {
+                    vehicle_model: model,
+                    distance: distance
+                }, 'Vehicle Travel');
             }
         });
 
@@ -467,88 +522,6 @@
             };
             await submitCalculation('/api/calculate/electricity', data, 'electricity consumption');
         });
-
-        // Add chart initialization
-        let emissionsChart = null;
-
-        function updateChart(emissions, type) {
-            const ctx = document.getElementById('emissionsChart').getContext('2d');
-            
-            // Destroy existing chart if it exists
-            if (emissionsChart) {
-                emissionsChart.destroy();
-            }
-
-            // Create new chart
-            emissionsChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Carbon Emissions', 'Carbon Neutral'],
-                    datasets: [{
-                        data: [emissions, Math.max(0, 100 - emissions)],
-                        backgroundColor: [
-                            '#10B981', // Green for emissions
-                            '#E5E7EB'  // Gray for neutral
-                        ],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    if (context.label === 'Carbon Emissions') {
-                                        return `${emissions.toFixed(2)} kg CO₂`;
-                                    }
-                                    return 'Carbon Neutral';
-                                }
-                            }
-                        }
-                    },
-                    cutout: '70%'
-                }
-            });
-        }
-
-        // Update the submitCalculation function to include additional stats
-        async function submitCalculation(endpoint, data, type) {
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                const result = await response.json();
-                
-                document.getElementById('emissionsValue').textContent = result.emissions.toFixed(2);
-                document.getElementById('emissionsDescription').textContent = 
-                    `This ${type} produces ${result.emissions.toFixed(2)} kg of CO₂ emissions.`;
-                document.getElementById('resultCard').style.display = 'block';
-                
-                // Update the chart
-                updateChart(result.emissions, type);
-
-                // Calculate additional stats
-                const treesNeeded = Math.ceil(result.emissions / 20); // Rough estimate: 1 tree absorbs ~20kg CO2/year
-                const daysToOffset = Math.ceil(result.emissions / 0.5); // Rough estimate: 0.5kg CO2/day per person
-                const offsetCost = (result.emissions * 0.02).toFixed(2); // Rough estimate: $0.02 per kg CO2
-
-                document.getElementById('treesValue').textContent = treesNeeded;
-                document.getElementById('daysValue').textContent = daysToOffset;
-                document.getElementById('costValue').textContent = `$${offsetCost}`;
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred while calculating emissions. Please try again.');
-            }
-        }
     </script>
 </body>
 </html> 
